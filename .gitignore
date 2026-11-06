@@ -1,0 +1,23 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# SQLite databases
+*.db
+*.sqlite3
+data/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS generated
+.DS_Store
+Thumbs.db

@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Expense Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 280px;
+            width: 100%;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body class="h-full font-sans antialiased text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                    <i class="fa-solid fa-wallet text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 tracking-tight leading-tight">Daily Expense Tracker</h1>
+                    <p class="text-xs text-slate-500 font-medium">Personal Finance & Daily Spend Log</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <!-- Currency Selector -->
+                <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
+                    <span class="text-xs font-medium text-slate-500 px-2">Currency:</span>
+                    <select id="currencySelector" onchange="changeCurrency(this.value)" class="bg-transparent text-xs font-semibold text-slate-700 outline-none pr-1 cursor-pointer">
+                        {% for label, symbol in currencies.items() %}
+                        <option value="{{ symbol }}" {% if label == default_currency %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Seed Data Action -->
+                <button onclick="seedSampleData()" title="Load demo data to test charts" class="hidden sm:inline-flex items-center px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800 rounded-lg transition-colors border border-slate-200">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-amber-500"></i> Sample Data
+                </button>
+
+                <!-- Add Expense Button -->
+                <button onclick="openAddModal()" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 active:bg-brand-800 rounded-lg shadow-sm hover:shadow transition-all">
+                    <i class="fa-solid fa-plus mr-2 text-xs"></i> Log Expense
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- KPI Metric Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Today's Spend -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Today</p>
+                    <p class="text-2xl font-bold text-slate-900 mt-1" id="kpiToday">-</p>
+                    <p class="text-xs text-slate-500 mt-0.5" id="kpiTodayCount">0 transactions</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-calendar-day"></i>
+                </div>
+            </div>
+
+            <!-- This Week's Spend -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">This Week</p>
+                    <p class="text-2xl font-bold text-slate-900 mt-1" id="kpiWeek">-</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Mon - Today</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-calendar-week"></i>
+                </div>
+            </div>
+
+            <!-- This Month's Spend -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">This Month</p>
+                    <p class="text-2xl font-bold text-slate-900 mt-1" id="kpiMonth">-</p>
+                    <p class="text-xs text-slate-500 mt-0.5" id="kpiMonthCount">0 transactions</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-calendar-alt"></i>
+                </div>
+            </div>
+
+            <!-- Daily Average (This Month) -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Daily Average</p>
+                    <p class="text-2xl font-bold text-slate-900 mt-1" id="kpiAvgDaily">-</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Current month pace</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter & Control Toolbar -->
+        <section class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <!-- Date Preset Pills -->
+                <div class="flex flex-wrap items-center gap-1.5" id="presetPills">
+                    <button onclick="setPreset('today')" class="preset-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" data-preset="today">Today</button>
+                    <button onclick="setPreset('7days')" class="preset-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" data-preset="7days">Last 7 Days</button>
+                    <button onclick="setPreset('thismonth')" class="preset-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-brand-500 bg-brand-50 text-brand-700 font-semibold" data-preset="thismonth">This Month</button>
+                    <button onclick="setPreset('30days')" class="preset-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" data-preset="30days">Last 30 Days</button>
+                    <button onclick="setPreset('all')" class="preset-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" data-preset="all">All Time</button>
+                </div>
+
+                <!-- Action Controls: Budget & Export -->
+                <div class="flex items-center space-x-2">
+                    <button onclick="openBudgetModal()" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors">
+                        <i class="fa-solid fa-bullseye mr-1.5 text-rose-500"></i> Monthly Budgets
+                    </button>
+                    <button onclick="exportCSV()" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors">
+                        <i class="fa-solid fa-file-csv mr-1.5"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Inputs Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+                <!-- Custom Date Range -->
+                <div class="flex items-center space-x-2">
+                    <input type="date" id="filterStartDate" onchange="onCustomDateChange()" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                    <span class="text-xs text-slate-400 font-medium">to</span>
+                    <input type="date" id="filterEndDate" onchange="onCustomDateChange()" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+
+                <!-- Category Filter -->
+                <div>
+                    <select id="filterCategory" onchange="applyFilters()" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none cursor-pointer">
+                        <option value="All">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Payment Method Filter -->
+                <div>
+                    <select id="filterPayment" onchange="applyFilters()" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none cursor-pointer">
+                        <option value="All">All Payment Methods</option>
+                        {% for pm in payment_methods %}
+                        <option value="{{ pm }}">{{ pm }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Search Input -->
+                <div class="relative">
+                    <input type="text" id="filterSearch" oninput="debounce(applyFilters, 300)()" placeholder="Search description..." class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Visual Analytics Grid -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Category Breakdown (Donut) -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                        <i class="fa-solid fa-chart-pie mr-2 text-brand-600"></i> Category Breakdown
+                    </h2>
+                    <span id="categoryChartTotal" class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full"></span>
+                </div>
+                <div class="chart-container flex-1 flex items-center justify-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Daily Spending Trend (Bar / Line) -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:col-span-2">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                        <i class="fa-solid fa-chart-column mr-2 text-indigo-600"></i> Daily Spending Trend
+                    </h2>
+                    <span class="text-xs text-slate-400 font-medium">Daily totals in selected timeframe</span>
+                </div>
+                <div class="chart-container flex-1">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Budget Tracker & Payment Breakdown Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Monthly Budgets Progress -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                            <i class="fa-solid fa-bullseye mr-2 text-rose-500"></i> Monthly Budget Tracking
+                        </h2>
+                        <span id="currentBudgetMonthLabel" class="text-xs text-slate-500 font-medium"></span>
+                    </div>
+                    <button onclick="openBudgetModal()" class="text-xs font-semibold text-brand-600 hover:text-brand-800">
+                        + Set Limits
+                    </button>
+                </div>
+                <div id="budgetsList" class="space-y-4">
+                    <!-- Dynamic budget progress rows -->
+                    <p class="text-xs text-slate-400 italic py-4 text-center">No budgets configured for this month. Click "+ Set Limits" to create one.</p>
+                </div>
+            </div>
+
+            <!-- Payment Method Distribution -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                        <i class="fa-solid fa-credit-card mr-2 text-teal-600"></i> Payment Methods
+                    </h2>
+                </div>
+                <div class="chart-container flex-1">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Transactions History Section -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900 flex items-center">
+                        <i class="fa-solid fa-list-check mr-2 text-slate-700"></i> Expense History
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5" id="historySummaryText">Showing recent expenses</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span id="filteredTotalBadge" class="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                        Total: -
+                    </span>
+                </div>
+            </div>
+
+            <!-- Expenses Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                        <tr>
+                            <th class="px-5 py-3">Date</th>
+                            <th class="px-5 py-3">Category</th>
+                            <th class="px-5 py-3">Description</th>
+                            <th class="px-5 py-3">Payment Method</th>
+                            <th class="px-5 py-3 text-right">Amount</th>
+                            <th class="px-5 py-3 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expensesTableBody" class="divide-y divide-slate-100">
+                        <!-- Table rows injected via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-12 px-4">
+                <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-2xl">
+                    <i class="fa-solid fa-receipt"></i>
+                </div>
+                <h3 class="text-sm font-bold text-slate-800">No expenses found</h3>
+                <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">No expenses recorded for this criteria. Click "Log Expense" above or click "Sample Data" to populate demo entries.</p>
+                <div class="mt-4 flex justify-center space-x-3">
+                    <button onclick="openAddModal()" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg">
+                        + Add First Expense
+                    </button>
+                    <button onclick="seedSampleData()" class="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200">
+                        Load Sample Data
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
+        Daily Expense Tracker &bull; Powered by Python & SQLite &bull; EMS
+    </footer>
+
+    <!-- ADD EXPENSE MODAL -->
+    <div id="addModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden fade-in">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h3 class="text-base font-bold text-slate-900 flex items-center">
+                    <i class="fa-solid fa-plus-circle mr-2 text-brand-600"></i> Record New Expense
+                </h3>
+                <button onclick="closeAddModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+            <form id="addExpenseForm" onsubmit="submitAddExpense(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Date *</label>
+                    <input type="date" id="addDate" required value="{{ today_date }}" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Category *</label>
+                    <select id="addCategory" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Amount (<span class="currencyLabel">₹</span>) *</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-slate-400 font-bold currencyLabel">₹</span>
+                        <input type="number" id="addAmount" step="0.01" min="0.01" required placeholder="0.00" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 font-semibold text-slate-900 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Payment Method *</label>
+                    <select id="addPayment" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                        {% for pm in payment_methods %}
+                        <option value="{{ pm }}">{{ pm }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Description / Notes</label>
+                    <input type="text" id="addDesc" placeholder="e.g. Lunch with friends, Fuel recharge..." class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+                <div class="pt-3 flex justify-end space-x-2">
+                    <button type="button" onclick="closeAddModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm">Save Expense</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- EDIT EXPENSE MODAL -->
+    <div id="editModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden fade-in">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h3 class="text-base font-bold text-slate-900 flex items-center">
+                    <i class="fa-solid fa-pen-to-square mr-2 text-indigo-600"></i> Edit Expense
+                </h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+            <form id="editExpenseForm" onsubmit="submitEditExpense(event)" class="p-6 space-y-4">
+                <input type="hidden" id="editId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Date *</label>
+                    <input type="date" id="editDate" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Category *</label>
+                    <select id="editCategory" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Amount (<span class="currencyLabel">₹</span>) *</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-slate-400 font-bold currencyLabel">₹</span>
+                        <input type="number" id="editAmount" step="0.01" min="0.01" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 font-semibold text-slate-900 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Payment Method *</label>
+                    <select id="editPayment" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                        {% for pm in payment_methods %}
+                        <option value="{{ pm }}">{{ pm }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Description / Notes</label>
+                    <input type="text" id="editDesc" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                </div>
+                <div class="pt-3 flex justify-end space-x-2">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MONTHLY BUDGET MODAL -->
+    <div id="budgetModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden fade-in">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h3 class="text-base font-bold text-slate-900 flex items-center">
+                    <i class="fa-solid fa-bullseye mr-2 text-rose-500"></i> Set Monthly Budget Target
+                </h3>
+                <button onclick="closeBudgetModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+            <form id="budgetForm" onsubmit="submitBudget(event)" class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Month *</label>
+                        <select id="budgetMonth" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Year *</label>
+                        <select id="budgetYear" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none"></select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Target Category *</label>
+                    <select id="budgetCategory" required class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                        <option value="Overall">🌟 Overall Monthly Spending Limit</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Monthly Limit (<span class="currencyLabel">₹</span>) *</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-slate-400 font-bold currencyLabel">₹</span>
+                        <input type="number" id="budgetAmount" step="10" min="1" required placeholder="5000" class="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 font-semibold text-slate-900 focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none">
+                    </div>
+                </div>
+                <div class="pt-3 flex justify-end space-x-2">
+                    <button type="button" onclick="closeBudgetModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm">Save Budget</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Application JavaScript -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
