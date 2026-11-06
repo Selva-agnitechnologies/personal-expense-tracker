@@ -16,3 +16,4 @@ echo Launching Application at http://localhost:5000
 start http://localhost:5000
 python app.py
 pause
+

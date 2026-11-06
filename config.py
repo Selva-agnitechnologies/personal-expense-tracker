@@ -46,3 +46,4 @@ CURRENCIES = {
 }
 
 DEFAULT_CURRENCY = "₹ INR (Indian Rupee)"
+

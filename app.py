@@ -203,3 +203,4 @@ if __name__ == "__main__":
     print(" 🌐 Open your browser at: http://localhost:5000")
     print("="*50 + "\n")
     app.run(host="127.0.0.1", port=5000, debug=True)
+
